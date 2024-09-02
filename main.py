@@ -60,18 +60,14 @@ def extract_text_from_doc(file):
 
     return '\n'.join(full_text)
 def get_response(model, model_behaviour, extracted_text, prompt):
-    all_dfs = []
 
+    all_dfs = []
     for chunk in chunk_text(extracted_text):
         try:
             response = model.generate_content([model_behaviour, chunk, prompt])
             return response.text
         except json.JSONDecodeError:
             st.error("Failed to parse JSON response.")
-    #
-    # if all_dfs:
-    #     return pd.concat(all_dfs, axis=0)
-    # else:
 
 def process_file(uploaded_file):
     if uploaded_file.name.endswith(".pdf"):
@@ -113,7 +109,7 @@ def compare_documents(doc1, doc2, model):
     Invoice Numbers: 'Difference'
     """
 
-    # Wrap documents in a dictionary or list as expected by the model
+    # Wrap documents in a dictionary or list
     combined_input = f"{model_behaviour}\nDocument 1:\n{doc1}\n\nDocument 2:\n{doc2}\n"
 
 
@@ -123,17 +119,16 @@ def compare_documents(doc1, doc2, model):
 
 model = initialise_model("gemini-1.5-flash")
 st.header("The Round Bot 3.0 - Gemini")
+
 # Read the prompt in text box
 prompt = "Generate a table from the DOC file content"
 
 with st.sidebar:
-    # Interface to upload DOC file
-    # Upload the first set of PDF or DOC files
+
     uploaded_files_set1 = st.file_uploader("Upload the first set of PDF or DOC files", type=["pdf", "docx"],
                                            accept_multiple_files=True)
     all_texts_set1 = []
 
-    # Upload the second set of PDF or DOC files
     uploaded_files_set2 = st.file_uploader("Upload the second set of PDF or DOC files", type=["pdf", "docx"],
                                            accept_multiple_files=True)
     all_texts_set2 = []
