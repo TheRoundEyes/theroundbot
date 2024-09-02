@@ -83,8 +83,7 @@ def process_file(uploaded_file):
 model_behaviour = """
 You are an expert in processing document structures and extracting data from them.
 We will upload a DOC file, and you need to extract the relevant information based on the given prompt.
-You will provide the output in table format. Text-based answers are not acceptable.
-STRICTLY FOLLOW THE FORMAT BELOW. REMOVE ALL OUTPUT KEYS
+You will provide the output in table format. Text-based answers are not acceptable. You have to strictly follow the format below.
 Given a document, your task is to extract the text value of the following entities:
 {
 'Company Name':'',
@@ -99,8 +98,7 @@ Given a document, your task is to extract the text value of the following entiti
     ],
 }
 If a Column is not present on the given columns, use the name of the column from the document. If you can't identify the value, leave it empty.
-Format the JSON properly as it should be in a dictionary format.
-Your output should be in JSON format and should only be called "table". 
+Format the JSON properly as it should be in a dictionary format. Your output should be in JSON format and should only be called "table". 
 Remove any other keys from the output.
 """
 
