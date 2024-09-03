@@ -1,18 +1,12 @@
-import os
-import pandas as pd
 import streamlit as st
-from google.generativeai import GenerativeModel, GenerationConfig
 import google.generativeai as genai
 from dotenv import load_dotenv
-import json
-from docx import Document
-import fitz  # PyMuPDF
-import pytesseract
-import pdfplumber
-from langchain.text_splitter import CharacterTextSplitter
+import extractor as ext
+import analyzer as ana
 import concurrent.futures
+import chat as chat
 
-st.set_page_config("The Round Bot 3.0 - Gemini",layout="wide")
+st.set_page_config("The Round Bot 3.0 - Gemini", layout="wide")
 
 load_dotenv()
 
@@ -20,65 +14,18 @@ api_key = st.text_input("Enter your API key", type="password")
 
 genai.configure(api_key=api_key)
 
-def chunk_text(text, chunk_size=2000, chunk_overlap=300, separator=" "):
-    splitter = CharacterTextSplitter(
-        separator=separator,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap
-    )
-    return splitter.split_text(text)
-
-def initialise_model(model_name="gemini-1.5-flash"):
-    # Instantiate the model
-    model = GenerativeModel(model_name="gemini-1.5-flash-001")
-
-    # Define the generation configuration
-    generation_config = GenerationConfig(
-        temperature=0.0,  # Adjust temperature as needed
-        response_mime_type="application/json"  # Ensures the response is in JSON format
-    )
-    return model
-
-def extract_text_from_pdf(file):
-    with pdfplumber.open(file) as pdf:
-        text = [page.extract_text() for page in pdf.pages]
-        return "\n\n".join(text)
-
-# Function to extract text from DOC files
-def extract_text_from_doc(file):
-    doc = Document(file)
-    full_text = []
-
-    for para in doc.paragraphs:
-        full_text.append(para.text)
-
-    # Extract text from tables
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                full_text.append(cell.text)
-
-    return '\n'.join(full_text)
-def get_response(model, model_behaviour, extracted_text, prompt):
-
-    all_dfs = []
-    for chunk in chunk_text(extracted_text):
-        try:
-            response = model.generate_content([model_behaviour, chunk, prompt])
-            return response.text
-        except json.JSONDecodeError:
-            st.error("Failed to parse JSON response.")
 
 def process_file(uploaded_file):
     if uploaded_file.name.endswith(".pdf"):
-        return extract_text_from_pdf(uploaded_file)
+        return ext.extract_text_from_pdf(uploaded_file)
     elif uploaded_file.name.endswith(".docx"):
-        return extract_text_from_doc(uploaded_file)
+        return ext.extract_text_from_doc(uploaded_file)
     return ""
+
 
 model_behaviour = """
 You are an expert in processing document structures and extracting data from them.
-We will upload a DOC file, and you need to extract the relevant information based on the given prompt.
+We will upload a DOC or PDF file, and you need to extract the relevant information based on the given prompt.
 You will provide the output in table format. Text-based answers are not acceptable. You have to strictly follow the format below.
 Given a document, your task is to extract the text value of the following entities:
 {
@@ -98,33 +45,13 @@ Format the JSON properly as it should be in a dictionary format. Your output sho
 Remove any other keys from the output.
 """
 
-
-def compare_documents(doc1, doc2, model):
-
-    model_behaviour = """
-    You are an expert in analyzing and comparing documents.
-    You are given two documents to compare and provide a detailed analysis and key differences of these documents.
-
-    When you compare them you must follow the format below:
-    Invoice Numbers: 'Difference'
-    """
-
-    # Wrap documents in a dictionary or list
-    combined_input = f"{model_behaviour}\nDocument 1:\n{doc1}\n\nDocument 2:\n{doc2}\n"
-
-
-    response = model.generate_content(combined_input)
-
-    return response.text
-
-model = initialise_model("gemini-1.5-flash")
+model = ana.initialise_model("gemini-1.5-flash")
 st.header("The Round Bot 3.0 - Gemini")
 
 # Read the prompt in text box
 prompt = "Generate a table from the DOC file content"
 
 with st.sidebar:
-
     uploaded_files_set1 = st.file_uploader("Upload the first set of PDF or DOC files", type=["pdf", "docx"],
                                            accept_multiple_files=True)
     all_texts_set1 = []
@@ -148,21 +75,31 @@ if uploaded_files_set1 and uploaded_files_set2:
     combined_text_set1 = ' '.join(all_texts_set1)
     combined_text_set2 = ' '.join(all_texts_set2)
 
+    #Store texts to vectorstore
+    documents = [combined_text_set1, combined_text_set2]
+    vectorstore = chat.create_vectorstore(documents)
+
+
     # Analyze both sets of texts using the LLM
-    df_set1 = get_response(model,combined_text_set1, model_behaviour, prompt)
-    df_set2 = get_response(model,combined_text_set2, model_behaviour, prompt)
+    df_set1 = ana.get_response(model, combined_text_set1, model_behaviour, prompt)
+    df_set2 = ana.get_response(model, combined_text_set2, model_behaviour, prompt)
 
     # Display the extracted data
     with col1:
         st.write("Extracted Data from Set 1:")
         with st.expander("Scroll to see more", expanded=True):
             st.write(df_set1)
-
-    with col2:
         st.write("Extracted Data from Set 2:")
         with st.expander("Scroll to see more", expanded=True):
             st.write(df_set2)
 
+    with col2:
+        chat_history = []
+        user_input = st.text_area("Enter your query here", "")
+        if st.button("Send"):
+            response = chat.answer_questions(vectorstore, user_input,chat_history)
+            st.write(response)
+            chat_history.append({"question": user_input, "answer": response})
 
-    comparison = compare_documents(combined_text_set1, combined_text_set2,model)
-    st.write(comparison)
+    # comparison = ana.compare_documents(combined_text_set1, combined_text_set2, model)
+    # st.write(comparison)
