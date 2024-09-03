@@ -8,8 +8,6 @@ import chat as chat
 
 st.set_page_config("The Round Bot 3.0 - Gemini", layout="wide")
 
-load_dotenv()
-
 api_key = st.text_input("Enter your API key", type="password")
 
 genai.configure(api_key=api_key)
